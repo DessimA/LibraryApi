@@ -11,5 +11,15 @@ namespace libraryApi.Data
 
         public DbSet<Livro> Livros { get; set; }
         public DbSet<Usuario> Usuarios { get; set; }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            if (!optionsBuilder.IsConfigured)
+            {
+                // Carrega a string de conexão do ambiente e configura o DbContext
+                var dbConnectionString = System.Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
+                optionsBuilder.UseNpgsql(dbConnectionString);
+            }
+        }
     }
 }

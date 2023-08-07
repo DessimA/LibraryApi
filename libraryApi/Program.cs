@@ -1,42 +1,67 @@
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using DotNetEnv; // Biblioteca para carregar variáveis de ambiente a partir do arquivo .env
 using libraryApi.Data;
-using System;
+using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using libraryApi.Repositories;
 
-namespace libraryApi
+Env.Load(); // Carrega as variáveis de ambiente do arquivo .env
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configuração do ambiente
+if (builder.Environment.IsDevelopment())
 {
-    public class Program
+    builder.Logging.ClearProviders(); // Limpa os provedores de log existentes
+    builder.Logging.AddConsole(); // Adiciona o provedor de log de console
+}
+
+ConfigureServices(builder); // Configuração dos serviços (injeção de dependência)
+ConfigureDatabase(builder); // Configuração do banco de dados
+ConfigureSwagger(builder); // Configuração do Swagger
+
+var app = builder.Build();
+
+app.UseRouting();
+app.UseSwagger(); // Habilita o uso do Swagger para documentar a API
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Library API v1");
+});
+
+app.UseEndpoints(endpoints =>
+{
+    endpoints.MapControllers(); // Mapeia os endpoints dos controladores
+});
+
+app.Run();
+
+void ConfigureServices(WebApplicationBuilder builder)
+{
+    builder.Services.AddControllers(); // Adiciona suporte a controladores
+    builder.Services.AddEndpointsApiExplorer(); // Adiciona suporte a exploração de API
+    builder.Services.AddScoped<ILivroRepository, LivroRepository>();
+    builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+}
+
+void ConfigureDatabase(WebApplicationBuilder builder)
+{
+    var dbConnectionString = Env.GetString("DATABASE_CONNECTION_STRING"); // Lê a string de conexão do arquivo .env
+    builder.Services.AddDbContext<LibraryDbContext>(options =>
     {
-        public static void Main(string[] args)
+        options.UseNpgsql(dbConnectionString); // Configura o uso do PostgreSQL com a string de conexão lida
+    });
+}
+
+void ConfigureSwagger(WebApplicationBuilder builder)
+{
+    builder.Services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new OpenApiInfo
         {
-            var host = CreateHostBuilder(args).Build();
-
-            using (var scope = host.Services.CreateScope())
-            {
-                var services = scope.ServiceProvider;
-                try
-                {
-                    var dbContext = services.GetRequiredService<LibraryDbContext>();
-                    // Aplicar migrações pendentes e criar o banco de dados se necessário
-                    dbContext.Database.EnsureCreated();
-                }
-                catch (Exception ex)
-                {
-                    // Tratar erros relacionados à criação do banco de dados ou migrações
-                    // Aqui você pode adicionar tratamento de erros apropriado, se necessário.
-                    Console.WriteLine($"Erro na criação do banco de dados: {ex.Message}");
-                }
-            }
-
-            host.Run();
-        }
-
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.UseStartup<Startup>();
-                });
-    }
+            Title = "Library API",
+            Version = "v1",
+            Description = "API para gerenciar livros e usuários de uma biblioteca"
+        });
+    });
 }
